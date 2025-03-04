@@ -1,0 +1,36 @@
+{
+  "name": "twitter-interaction-manager",
+  "version": "1.0.0",
+  "description": "Chrome extension for managing Twitter interactions efficiently",
+  "scripts": {
+    "start": "webpack --watch --progress --config webpack.config.js",
+    "build": "webpack --config webpack.config.js",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.13.0",
+    "@mui/icons-material": "^5.11.16",
+    "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.236",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.4",
+    "ts-loader": "^9.4.2",
+    "webpack": "^5.82.1",
+    "webpack-cli": "^5.1.1",
+    "copy-webpack-plugin": "^11.0.0",
+    "@babel/core": "^7.21.8",
+    "@babel/preset-react": "^7.18.6",
+    "@babel/preset-typescript": "^7.21.5",
+    "babel-loader": "^9.1.2",
+    "rimraf": "^5.0.0"
+  }
+}
