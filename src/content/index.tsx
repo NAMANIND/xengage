@@ -3,6 +3,27 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
+// Inject the XHR interceptor script
+const script = document.createElement("script");
+script.src = chrome.runtime.getURL("injector.js");
+(document.head || document.documentElement).appendChild(script);
+
+script.onload = function () {
+  script.remove();
+};
+
+// Listen for messages from the injected script
+window.addEventListener("message", function (event) {
+  if (event.data.type === "CAPTURED_HEADER") {
+    // Forward the captured header to the background script
+    chrome.runtime.sendMessage({
+      type: "CAPTURED_HEADER",
+      header: event.data.header,
+      value: event.data.value,
+    });
+  }
+});
+
 interface RequestMessage {
   type: string;
   tweetId: string;

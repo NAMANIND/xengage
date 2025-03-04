@@ -8,6 +8,7 @@ module.exports = {
     popup: "./src/popup/index.tsx",
     background: "./src/background/index.ts",
     content: "./src/content/index.tsx",
+    injector: "./src/content/injector.js",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
