@@ -1,6 +1,15 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
 interface TwitterAuthTokens {
   bearerToken: string;
@@ -95,64 +104,68 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
       <AnimatePresence mode="wait">
         {showWelcome && (
-          <motion.h1
+          <motion.div
             key="welcome"
-            initial={{ opacity: 1, rotate: 0 }}
-            animate={{ opacity: 0, rotate: 360 }}
-            exit={{ opacity: 0, rotate: 720 }}
-            transition={{ duration: 1.5 }}
-            className="text-5xl font-bold text-white"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.5 }}
+            className="text-center"
           >
-            Welcome to Twitter Manager
-          </motion.h1>
+            <h1 className="text-5xl font-bold text-white mb-4">
+              Welcome to Twitter Manager
+            </h1>
+            <p className="text-gray-300 text-xl">
+              Let's get you set up for success
+            </p>
+          </motion.div>
         )}
         {showProfile && (
           <motion.div
             key="profile"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-8"
+            className="w-full max-w-md"
           >
-            {userProfile?.profile_image_url_https && (
-              <motion.img
-                src={userProfile.profile_image_url_https}
-                alt="Profile"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3 }}
-                className="w-24 h-24 rounded-full mx-auto border-4 border-white"
-              />
-            )}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.5 }}
-              className="space-y-4"
-            >
-              <h2 className="text-3xl font-bold text-white">
-                {userProfile?.name || "Welcome"}
-              </h2>
-              {userProfile?.screen_name && (
-                <p className="text-gray-400">@{userProfile.screen_name}</p>
-              )}
-              <p className="text-xl text-gray-300">
-                Let's create your Twitter engagement persona
-              </p>
-            </motion.div>
-            <motion.button
-              onClick={onNext}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 bg-white text-black rounded-full font-semibold text-lg hover:bg-gray-100 transition-colors"
-            >
-              Create My Persona
-            </motion.button>
+            <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-lg">
+              <CardHeader className="text-center">
+                {userProfile?.profile_image_url_https && (
+                  <motion.img
+                    src={userProfile.profile_image_url_https}
+                    alt="Profile"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="w-24 h-24 rounded-full mx-auto border-4 border-white mb-4"
+                  />
+                )}
+                <CardTitle className="text-3xl text-white">
+                  {userProfile?.name || "Welcome"}
+                </CardTitle>
+                {userProfile?.screen_name && (
+                  <CardDescription className="text-gray-300">
+                    @{userProfile.screen_name}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl text-center text-gray-200 mb-6">
+                  Let's create your Twitter engagement persona
+                </p>
+              </CardContent>
+              <CardFooter className="justify-center">
+                <Button
+                  onClick={onNext}
+                  size="lg"
+                  className="bg-white text-gray-900 hover:bg-gray-100"
+                >
+                  Create My Persona
+                </Button>
+              </CardFooter>
+            </Card>
           </motion.div>
         )}
       </AnimatePresence>
@@ -482,7 +495,7 @@ const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black">
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
       <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
     </div>
   );
@@ -502,113 +515,98 @@ const CommunicationStyleStep = ({
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -50 }}
-      className="bg-white p-8 rounded-lg max-w-2xl w-full"
+      className="w-full max-w-2xl"
     >
-      <motion.h2
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="text-2xl font-bold text-black mb-6"
-      >
-        Communication Style
-      </motion.h2>
-      <div className="space-y-8">
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <label className="block text-sm font-medium text-gray-700 mb-4">
-            How formal should your tweets be?
-          </label>
-          <div className="flex space-x-4">
-            {["formal", "casual"].map((option) => (
-              <motion.button
-                key={option}
-                onClick={() => onUpdate({ ...data, formality: option as any })}
-                className={`px-6 py-3 rounded-full text-lg font-medium transition-all transform ${
-                  data.formality === option
-                    ? "bg-black text-white scale-105"
-                    : "bg-gray-200 text-black hover:bg-gray-300"
-                }`}
-                whileHover={{ scale: data.formality === option ? 1.05 : 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </motion.button>
-            ))}
+      <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl text-white">
+            Communication Style
+          </CardTitle>
+          <CardDescription className="text-gray-300">
+            Choose how you want to interact with your audience
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-200">
+              How formal should your tweets be?
+            </label>
+            <div className="flex gap-4">
+              {["formal", "casual"].map((option) => (
+                <Button
+                  key={option}
+                  onClick={() =>
+                    onUpdate({ ...data, formality: option as any })
+                  }
+                  variant={data.formality === option ? "default" : "outline"}
+                  className={
+                    data.formality === option
+                      ? "bg-white text-gray-900"
+                      : "text-white border-white/20 hover:bg-white/10"
+                  }
+                >
+                  {option.charAt(0).toUpperCase() + option.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.4 }}
-        >
-          <label className="block text-sm font-medium text-gray-700 mb-4">
-            How detailed should your responses be?
-          </label>
-          <div className="flex space-x-4">
-            {["verbose", "concise"].map((option) => (
-              <motion.button
-                key={option}
-                onClick={() => onUpdate({ ...data, verbosity: option as any })}
-                className={`px-6 py-3 rounded-full text-lg font-medium transition-all transform ${
-                  data.verbosity === option
-                    ? "bg-black text-white scale-105"
-                    : "bg-gray-200 text-black hover:bg-gray-300"
-                }`}
-                whileHover={{ scale: data.verbosity === option ? 1.05 : 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </motion.button>
-            ))}
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-200">
+              How detailed should your responses be?
+            </label>
+            <div className="flex gap-4">
+              {["verbose", "concise"].map((option) => (
+                <Button
+                  key={option}
+                  onClick={() =>
+                    onUpdate({ ...data, verbosity: option as any })
+                  }
+                  variant={data.verbosity === option ? "default" : "outline"}
+                  className={
+                    data.verbosity === option
+                      ? "bg-white text-gray-900"
+                      : "text-white border-white/20 hover:bg-white/10"
+                  }
+                >
+                  {option.charAt(0).toUpperCase() + option.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          <label className="block text-sm font-medium text-gray-700 mb-4">
-            What tone should your tweets have?
-          </label>
-          <div className="flex space-x-4">
-            {["serious", "humorous"].map((option) => (
-              <motion.button
-                key={option}
-                onClick={() => onUpdate({ ...data, tone: option as any })}
-                className={`px-6 py-3 rounded-full text-lg font-medium transition-all transform ${
-                  data.tone === option
-                    ? "bg-black text-white scale-105"
-                    : "bg-gray-200 text-black hover:bg-gray-300"
-                }`}
-                whileHover={{ scale: data.tone === option ? 1.05 : 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </motion.button>
-            ))}
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-200">
+              What tone should your tweets have?
+            </label>
+            <div className="flex gap-4">
+              {["serious", "humorous"].map((option) => (
+                <Button
+                  key={option}
+                  onClick={() => onUpdate({ ...data, tone: option as any })}
+                  variant={data.tone === option ? "default" : "outline"}
+                  className={
+                    data.tone === option
+                      ? "bg-white text-gray-900"
+                      : "text-white border-white/20 hover:bg-white/10"
+                  }
+                >
+                  {option.charAt(0).toUpperCase() + option.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="pt-4"
-        >
-          <motion.button
+        </CardContent>
+        <CardFooter className="justify-end">
+          <Button
             onClick={onNext}
-            className="w-full px-6 py-4 text-lg font-semibold text-white bg-black rounded-full hover:bg-gray-900 transition-all transform"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            size="lg"
+            className="bg-white text-gray-900 hover:bg-gray-100"
           >
             Next Step
-          </motion.button>
-        </motion.div>
-      </div>
+          </Button>
+        </CardFooter>
+      </Card>
     </motion.div>
   );
 };

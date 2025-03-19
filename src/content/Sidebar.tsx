@@ -14,6 +14,9 @@ import {
   Tabs,
   Tab,
   Chip,
+  AppBar,
+  Toolbar,
+  Divider,
 } from "@mui/material";
 import { TwitterUser, TwitterApiResponse, CreateTweetPayload } from "../types";
 import EditIcon from "@mui/icons-material/Edit";
@@ -29,6 +32,9 @@ import { theme } from "../theme";
 import Onboarding from "../components/Onboarding";
 import TaskIcon from "@mui/icons-material/Task";
 import TwitterIcon from "@mui/icons-material/Twitter";
+import PeopleIcon from "@mui/icons-material/People";
+import ConnectionManager from "../components/ConnectionManager";
+import { Connection } from "../types";
 
 interface Tweet {
   id: string;
@@ -69,9 +75,10 @@ const Sidebar: React.FC = () => {
   const [hasMoreTweets, setHasMoreTweets] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeView, setActiveView] = useState<"interactions" | "tasks">(
-    "interactions"
-  );
+  const [activeView, setActiveView] = useState<
+    "interactions" | "tasks" | "connections"
+  >("interactions");
+  const [connections, setConnections] = useState<Connection[]>([]);
 
   const loadSavedUsers = async () => {
     try {
@@ -116,6 +123,19 @@ const Sidebar: React.FC = () => {
         setShowOnboarding(true);
       }
     });
+  }, []);
+
+  useEffect(() => {
+    // Load connections when component mounts
+    const loadConnections = async () => {
+      try {
+        const result = await chrome.storage.local.get("connections");
+        setConnections(result.connections || []);
+      } catch (error) {
+        console.error("Error loading connections:", error);
+      }
+    };
+    loadConnections();
   }, []);
 
   const handleOnboardingComplete = () => {
@@ -173,12 +193,32 @@ const Sidebar: React.FC = () => {
           user,
         });
 
+        // Create a new connection when adding a user
+        const newConnection: Connection = {
+          ...user,
+          notes: "",
+          category: "other",
+          lastInteraction: new Date().toISOString(),
+        };
+
+        // Load existing connections
+        const result = await chrome.storage.local.get("connections");
+        const existingConnections = result.connections || [];
+
+        // Add new connection if it doesn't exist
+        if (
+          !existingConnections.find(
+            (c: Connection) => c.rest_id === user.rest_id
+          )
+        ) {
+          const updatedConnections = [...existingConnections, newConnection];
+          await chrome.storage.local.set({ connections: updatedConnections });
+          setConnections(updatedConnections);
+        }
+
         // Update local state
         setSavedUsers((prev) => [...prev, user]);
-        setUsername(""); // Clear input
-
-        // Optionally select the newly added user
-        // setSelectedUser(user);
+        setUsername("");
       }
     } catch (error) {
       console.error("Error fetching user by username:", error);
@@ -446,6 +486,16 @@ const Sidebar: React.FC = () => {
   const handleGenerateComment = async (tweetId: string, tweetText: string) => {
     console.log("Generating comment for tweet:", tweetText);
     try {
+      // Get the connection for the current user to personalize the comment
+      const connection = connections.find(
+        (c) => c.rest_id === selectedUser?.rest_id
+      );
+      let prompt = tweetText;
+
+      if (connection) {
+        prompt = `Given that this person is my ${connection.category} and here's what I know about them: "${connection.notes}". Generate a short (one or two liner) insightful comment for their tweet: "${tweetText}". The comment should be personalized based on our relationship and what I know about them. Don't use hashtags.`;
+      }
+
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBmCj6xENfje_hSUC_rBkcsZB6omMfQejQ`,
         {
@@ -456,15 +506,7 @@ const Sidebar: React.FC = () => {
           body: JSON.stringify({
             contents: [
               {
-                parts: [{ text: tweetText }],
-                role: "user",
-              },
-              {
-                parts: [
-                  {
-                    text: "Generate a short (one or two liner) insightful comment for this tweet don't use hashtags",
-                  },
-                ],
+                parts: [{ text: prompt }],
                 role: "user",
               },
             ],
@@ -474,14 +516,12 @@ const Sidebar: React.FC = () => {
 
       const data = await response.json();
 
-      // Updated to handle the new response format
       if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         const generatedComment = data.candidates[0].content.parts[0].text;
         setGeneratedComments((prev) => ({
           ...prev,
           [tweetId]: generatedComment,
         }));
-        // Automatically enable edit mode after generation
         setEditingComments((prev) => ({
           ...prev,
           [tweetId]: true,
@@ -881,154 +921,488 @@ const Sidebar: React.FC = () => {
       {showOnboarding ? (
         <Onboarding onComplete={handleOnboardingComplete} />
       ) : (
-        <div className="min-h-screen bg-gray-50">
-          <div className="h-screen overflow-hidden">
-            <div className="p-6 h-full overflow-auto">
-              {activeView === "interactions" ? (
-                <>
-                  <motion.h1
+        <Box
+          sx={{
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            bgcolor: "background.default",
+          }}
+        >
+          {/* Top Navigation Bar */}
+          <AppBar
+            position="static"
+            elevation={0}
+            sx={{
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            <Toolbar sx={{ minHeight: "64px" }}>
+              <Tabs
+                value={
+                  activeView === "interactions"
+                    ? 0
+                    : activeView === "tasks"
+                    ? 1
+                    : 2
+                }
+                onChange={(_, newValue) => {
+                  setActiveView(
+                    newValue === 0
+                      ? "interactions"
+                      : newValue === 1
+                      ? "tasks"
+                      : "connections"
+                  );
+                }}
+                sx={{
+                  flex: 1,
+                  "& .MuiTab-root": {
+                    color: "text.primary",
+                    "&.Mui-selected": {
+                      color: "black",
+                    },
+                  },
+                  "& .MuiTabs-indicator": {
+                    backgroundColor: "black",
+                  },
+                }}
+                centered
+              >
+                <Tab
+                  icon={<TwitterIcon />}
+                  label="Interactions"
+                  sx={{ minHeight: "64px" }}
+                />
+                <Tab
+                  icon={<TaskIcon />}
+                  label="Tasks"
+                  sx={{ minHeight: "64px" }}
+                />
+                <Tab
+                  icon={<PeopleIcon />}
+                  label="Connections"
+                  sx={{ minHeight: "64px" }}
+                />
+              </Tabs>
+            </Toolbar>
+          </AppBar>
+
+          {/* Main Content Area */}
+          <Box
+            sx={{
+              flex: 1,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {activeView === "interactions" ? (
+              <Box
+                sx={{
+                  flex: 1,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* User Selection Area */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-2xl font-bold text-gray-900 mb-6"
+                    transition={{ duration: 0.3 }}
                   >
-                    Twitter Interaction Manager
-                  </motion.h1>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-xl shadow-md p-6 mb-6"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="text"
+                    <Stack spacing={2}>
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           placeholder="Enter Twitter username"
-                          className="flex-1 px-4 py-2 border border-gray-200 rounded-full focus:ring-2 focus:ring-black focus:border-transparent"
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              borderRadius: "24px",
+                              borderColor: "black",
+                              "&:hover": {
+                                borderColor: "black",
+                              },
+                              "&.Mui-focused": {
+                                borderColor: "black",
+                              },
+                            },
+                          }}
                         />
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                        <IconButton
                           onClick={handleAddUser}
                           disabled={addingUser || !username}
-                          className="p-2 bg-black text-white rounded-full hover:bg-gray-900 disabled:opacity-50"
+                          sx={{
+                            bgcolor: "black",
+                            color: "white",
+                            "&:hover": {
+                              bgcolor: "rgba(0, 0, 0, 0.8)",
+                            },
+                            "&.Mui-disabled": {
+                              bgcolor: "action.disabledBackground",
+                            },
+                          }}
                         >
                           {addingUser ? (
-                            <div className="w-6 h-6 border-2 border-white rounded-full animate-spin border-t-transparent" />
+                            <CircularProgress size={24} color="inherit" />
                           ) : (
-                            <PersonAddIcon className="w-6 h-6" />
+                            <PersonAddIcon />
                           )}
-                        </motion.button>
-                      </div>
+                        </IconButton>
+                      </Box>
 
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Select User
-                        </label>
-                        <select
-                          value={selectedUser?.rest_id || ""}
-                          onChange={(e) => {
-                            const user = savedUsers.find(
-                              (u) => u.rest_id === e.target.value
-                            );
-                            setSelectedUser(user || null);
-                            if (user) fetchTweets(user.rest_id);
-                          }}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        >
-                          <option value="">
-                            {savedUsers.length === 0
-                              ? "No users added yet"
-                              : "Select a user"}
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        value={selectedUser?.rest_id || ""}
+                        onChange={(e) => {
+                          const user = savedUsers.find(
+                            (u) => u.rest_id === e.target.value
+                          );
+                          setSelectedUser(user || null);
+                          if (user) fetchTweets(user.rest_id);
+                        }}
+                        SelectProps={{
+                          native: true,
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "24px",
+                            borderColor: "black",
+                            "&:hover": {
+                              borderColor: "black",
+                            },
+                            "&.Mui-focused": {
+                              borderColor: "black",
+                            },
+                          },
+                        }}
+                      >
+                        <option value="">
+                          {savedUsers.length === 0
+                            ? "No users added yet"
+                            : "Select a user"}
+                        </option>
+                        {savedUsers.map((user) => (
+                          <option key={user.rest_id} value={user.rest_id}>
+                            {user.name} (@{user.screen_name})
                           </option>
-                          {savedUsers.map((user) => (
-                            <option key={user.rest_id} value={user.rest_id}>
-                              {user.name} (@{user.screen_name})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                        ))}
+                      </TextField>
+
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={() => fetchTweets()}
+                        disabled={isLoading}
+                        startIcon={
+                          isLoading ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : (
+                            <RefreshIcon />
+                          )
+                        }
+                        sx={{
+                          borderRadius: "24px",
+                          py: 1,
+                          bgcolor: "black",
+                          "&:hover": {
+                            bgcolor: "rgba(0, 0, 0, 0.8)",
+                          },
+                        }}
+                      >
+                        {isLoading
+                          ? "Fetching Tweets..."
+                          : "Fetch Latest Tweets"}
+                      </Button>
+                    </Stack>
                   </motion.div>
+                </Paper>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => fetchTweets()}
-                    disabled={isLoading}
-                    className="w-full mb-6 px-6 py-3 bg-black text-white rounded-full hover:bg-gray-900 disabled:opacity-50 shadow-md hover:shadow-lg transition-all"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-5 h-5 border-2 border-white rounded-full animate-spin border-t-transparent" />
-                        <span>Fetching Tweets...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center space-x-2">
-                        <RefreshIcon className="w-5 h-5" />
-                        <span>Fetch Latest Tweets</span>
-                      </div>
-                    )}
-                  </motion.button>
-
+                {/* Tweets List */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    overflow: "auto",
+                    px: 3,
+                    py: 2,
+                  }}
+                >
                   {error && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 mb-6 bg-red-50 border border-red-200 rounded-xl text-red-600"
                     >
-                      {error}
+                      <Paper
+                        sx={{
+                          p: 2,
+                          mb: 2,
+                          bgcolor: "error.light",
+                          color: "error.dark",
+                          borderRadius: 2,
+                        }}
+                      >
+                        {error}
+                      </Paper>
                     </motion.div>
                   )}
 
-                  <AnimatePresence mode="popLayout">
-                    <div className="space-y-4">
-                      {tweets.map((tweet) => renderTweet(tweet))}
-                    </div>
+                  <AnimatePresence>
+                    <Stack spacing={2}>
+                      {tweets.map((tweet, index) => (
+                        <motion.div
+                          key={tweet.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <TweetCard
+                            tweet={tweet}
+                            generatedComment={generatedComments[tweet.id]}
+                            isEditing={editingComments[tweet.id]}
+                            isLiking={likingTweets[tweet.id]}
+                            isCommenting={commentingTweets[tweet.id]}
+                            onGenerateComment={() =>
+                              handleGenerateComment(tweet.id, tweet.text)
+                            }
+                            onEditComment={() => handleEditComment(tweet.id)}
+                            onUpdateComment={(text) =>
+                              setGeneratedComments((prev) => ({
+                                ...prev,
+                                [tweet.id]: text,
+                              }))
+                            }
+                            onPostComment={() => handlePostComment(tweet.id)}
+                            onLike={() => handleLikeTweet(tweet.id)}
+                          />
+                        </motion.div>
+                      ))}
+                    </Stack>
                   </AnimatePresence>
 
                   {hasMoreTweets && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={loadMoreTweets}
-                      disabled={isLoading}
-                      className="w-full mt-6 px-6 py-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 disabled:opacity-50"
-                    >
-                      {isLoading ? "Loading..." : "Load More Tweets"}
-                    </motion.button>
+                    <Box sx={{ textAlign: "center", mt: 2 }}>
+                      <Button
+                        onClick={loadMoreTweets}
+                        disabled={isLoading}
+                        variant="outlined"
+                        sx={{
+                          borderRadius: "24px",
+                          borderColor: "black",
+                          color: "black",
+                          "&:hover": {
+                            borderColor: "black",
+                            bgcolor: "rgba(0, 0, 0, 0.04)",
+                          },
+                        }}
+                      >
+                        {isLoading ? "Loading..." : "Load More Tweets"}
+                      </Button>
+                    </Box>
                   )}
-                </>
-              ) : (
-                <TaskManager onViewChange={setActiveView} />
-              )}
-
-              {/* Navigation */}
-              <div className="fixed bottom-6 right-6">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() =>
-                    setActiveView(
-                      activeView === "interactions" ? "tasks" : "interactions"
-                    )
-                  }
-                  className="p-4 bg-black text-white rounded-full shadow-lg hover:bg-gray-900"
-                >
-                  {activeView === "interactions" ? (
-                    <TaskIcon className="w-6 h-6" />
-                  ) : (
-                    <TwitterIcon className="w-6 h-6" />
-                  )}
-                </motion.button>
-              </div>
-            </div>
-          </div>
-        </div>
+                </Box>
+              </Box>
+            ) : activeView === "tasks" ? (
+              <TaskManager onViewChange={(view) => setActiveView(view)} />
+            ) : (
+              <ConnectionManager
+                onClose={() => setActiveView("interactions")}
+              />
+            )}
+          </Box>
+        </Box>
       )}
     </ThemeProvider>
+  );
+};
+
+// Add interface for TweetCard props
+interface TweetCardProps {
+  tweet: Tweet;
+  generatedComment: string | undefined;
+  isEditing: boolean;
+  isLiking: boolean;
+  isCommenting: boolean;
+  onGenerateComment: () => void;
+  onEditComment: () => void;
+  onUpdateComment: (text: string) => void;
+  onPostComment: () => void;
+  onLike: () => void;
+}
+
+// Update TweetCard component with consistent styling
+const TweetCard: React.FC<TweetCardProps> = ({
+  tweet,
+  generatedComment,
+  isEditing,
+  isLiking,
+  isCommenting,
+  onGenerateComment,
+  onEditComment,
+  onUpdateComment,
+  onPostComment,
+  onLike,
+}) => {
+  return (
+    <Paper
+      elevation={1}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: "divider",
+        "&:hover": {
+          boxShadow: 2,
+        },
+      }}
+    >
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+            {tweet.text}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {formatDistanceToNow(new Date(tweet.created_at), {
+              addSuffix: true,
+            })}
+          </Typography>
+        </Box>
+
+        <Stack spacing={1} alignItems="center">
+          {tweet.hasCommented && (
+            <Chip
+              icon={<CommentIcon />}
+              label="Commented"
+              color="success"
+              variant="outlined"
+              sx={{
+                borderColor: "black",
+                color: "black",
+                "& .MuiChip-icon": {
+                  color: "black",
+                },
+              }}
+            />
+          )}
+
+          <IconButton
+            onClick={onLike}
+            disabled={isLiking}
+            sx={{
+              color: tweet.isLiked ? "error.main" : "text.primary",
+              "&:hover": {
+                bgcolor: tweet.isLiked ? "error.lighter" : "action.hover",
+              },
+            }}
+          >
+            {isLiking ? <CircularProgress size={24} /> : <FavoriteIcon />}
+          </IconButton>
+
+          {generatedComment ? (
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, width: "100%", borderRadius: 2 }}
+            >
+              {isEditing ? (
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={generatedComment}
+                  onChange={(e) => onUpdateComment(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  sx={{
+                    mb: 2,
+                    "& .MuiOutlinedInput-root": {
+                      borderColor: "black",
+                      "&:hover": {
+                        borderColor: "black",
+                      },
+                      "&.Mui-focused": {
+                        borderColor: "black",
+                      },
+                    },
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  {generatedComment}
+                </Typography>
+              )}
+
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button
+                  size="small"
+                  startIcon={<EditIcon />}
+                  onClick={onEditComment}
+                  variant="outlined"
+                  sx={{
+                    borderColor: "black",
+                    color: "black",
+                    "&:hover": {
+                      borderColor: "black",
+                      bgcolor: "rgba(0, 0, 0, 0.04)",
+                    },
+                  }}
+                >
+                  {isEditing ? "Done" : "Edit"}
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={
+                    isCommenting ? <CircularProgress size={16} /> : <SendIcon />
+                  }
+                  onClick={onPostComment}
+                  disabled={isCommenting}
+                  variant="contained"
+                  sx={{
+                    bgcolor: "black",
+                    "&:hover": {
+                      bgcolor: "rgba(0, 0, 0, 0.8)",
+                    },
+                  }}
+                >
+                  Send
+                </Button>
+              </Stack>
+            </Paper>
+          ) : (
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={onGenerateComment}
+              variant="outlined"
+              sx={{
+                borderRadius: "24px",
+                borderColor: "black",
+                color: "black",
+                "&:hover": {
+                  borderColor: "black",
+                  bgcolor: "rgba(0, 0, 0, 0.04)",
+                },
+              }}
+            >
+              Generate Comment
+            </Button>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
   );
 };
 

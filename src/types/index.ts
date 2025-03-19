@@ -59,3 +59,17 @@ export interface CreateTweetPayload {
   };
   queryId: string;
 }
+
+export interface Connection extends TwitterUser {
+  notes: string;
+  category: ConnectionCategory;
+  lastInteraction?: string;
+}
+
+export type ConnectionCategory =
+  | "lead"
+  | "recruiter"
+  | "friend"
+  | "colleague"
+  | "mentor"
+  | "other";
