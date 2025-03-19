@@ -147,12 +147,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "SAVE_USER") {
+    // Check if user already exists
     const userExists = savedUsers.some(
       (u) => u.rest_id === request.user.rest_id
     );
     if (!userExists) {
       savedUsers.push(request.user);
-      chrome.storage.sync.set({ savedUsers }, () => {
+      // Store in extension storage
+      chrome.storage.local.set({ savedUsers }, () => {
         sendResponse({ success: true, users: savedUsers });
       });
     } else {
@@ -161,9 +163,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "STORE_SCREEN_NAME") {
+    console.log("store screen name", request.screen_name);
+    chrome.storage.local.set({
+      main_screen_name: request.screen_name,
+    });
+
+    sendResponse({ success: true });
+  }
+
+  if (request.type === "GET_CURRENT_USER_SCREEN_NAME") {
+    chrome.storage.local.get("main_screen_name", (result) => {
+      sendResponse({ screen_name: result.main_screen_name });
+    });
+    return true;
+  }
+
   if (request.type === "GET_SAVED_USERS") {
-    chrome.storage.sync.get("savedUsers", (data) => {
-      savedUsers = data.savedUsers || [];
+    // Get from extension storage and update in-memory array
+    chrome.storage.local.get(["savedUsers"], (result) => {
+      savedUsers = result.savedUsers || [];
       sendResponse({ users: savedUsers });
     });
     return true;
@@ -173,8 +192,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function fetchUserByUsername(username: string): Promise<TwitterUser> {
-  const url = `https://x.com/i/api/graphql/-0XdHI-mrHWBQd8-oLo1aA/ProfileSpotlightsQuery`;
-  const variables = { screen_name: username };
+  const url = `https://twitter.com/i/api/graphql/G3KGOASz96M-Qu0nwmGXNg/UserByScreenName`;
+  const variables = {
+    screen_name: username,
+    withSafetyModeUserFields: true,
+    features: {
+      responsive_web_twitter_blue_verified_badge_is_enabled: true,
+      verified_phone_label_enabled: false,
+      responsive_web_graphql_timeline_navigation_enabled: true,
+    },
+  };
 
   const response = await fetch(
     `${url}?variables=${encodeURIComponent(JSON.stringify(variables))}`,
@@ -182,6 +209,7 @@ async function fetchUserByUsername(username: string): Promise<TwitterUser> {
       headers: {
         authorization: twitterAuthTokens.bearerToken,
         "x-csrf-token": twitterAuthTokens.csrfToken,
+        "content-type": "application/json",
       },
     }
   );
@@ -190,9 +218,12 @@ async function fetchUserByUsername(username: string): Promise<TwitterUser> {
     throw new Error("Failed to fetch user data");
   }
 
-  const data: UserResponse = await response.json();
-  const userData = data.data.user_result_by_screen_name.result;
+  const data = await response.json();
+  if (!data.data?.user?.result) {
+    throw new Error("User not found");
+  }
 
+  const userData = data.data.user.result;
   return {
     id: userData.rest_id,
     rest_id: userData.rest_id,

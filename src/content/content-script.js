@@ -22,4 +22,11 @@ window.addEventListener("message", function (event) {
       url: event.data.url,
     });
   }
+  if (event.data.type === "STORE_SCREEN_NAME") {
+    console.log("STORE_SCREEN_NAME", event.data.screen_name);
+    chrome.runtime.sendMessage({
+      type: "STORE_SCREEN_NAME",
+      screen_name: event.data.screen_name,
+    });
+  }
 });

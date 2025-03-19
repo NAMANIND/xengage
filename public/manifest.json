@@ -33,5 +33,9 @@
       "resources": ["injector.js"],
       "matches": ["https://x.com/*", "https://twitter.com/*"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals"
+  }
 }
